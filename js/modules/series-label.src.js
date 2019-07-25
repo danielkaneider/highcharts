@@ -41,7 +41,8 @@
 import H from '../parts/Globals.js';
 
 import U from '../parts/Utilities.js';
-var isNumber = U.isNumber;
+var isNumber = U.isNumber,
+    syncTimeout = U.syncTimeout;
 
 import '../parts/Chart.js';
 import '../parts/Series.js';
@@ -1049,7 +1050,7 @@ function drawLabels(e) {
         }
     });
 
-    chart.seriesLabelTimer = H.syncTimeout(function () {
+    chart.seriesLabelTimer = syncTimeout(function () {
         if (chart.series && chart.labelSeries) { // #7931, chart destroyed
             chart.drawSeriesLabels();
         }

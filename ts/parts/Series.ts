@@ -650,7 +650,8 @@ const {
     isNumber,
     isString,
     objectEach,
-    splat
+    splat,
+    syncTimeout
 } = U;
 
 import './Options.js';
@@ -673,7 +674,6 @@ var addEvent = H.addEvent,
     Point = H.Point, // @todo  add as a requirement
     removeEvent = H.removeEvent,
     SVGElement = H.SVGElement,
-    syncTimeout = H.syncTimeout,
     win = H.win;
 
 /**

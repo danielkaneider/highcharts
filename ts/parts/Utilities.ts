@@ -311,6 +311,17 @@ declare global {
         function splat(obj: any): Array<any>;
         function stableSort(arr: Array<any>, sortFunction: Function): void;
         function stop(el: SVGElement, prop?: string): void;
+        function syncTimeout(fn: Function): undefined;
+        function syncTimeout(
+            fn: Function,
+            delay: (undefined|0),
+            context?: unknown
+        ): undefined;
+        function syncTimeout(
+            fn: Function,
+            delay: number,
+            context?: unknown
+        ): number;
         function syncTimeout(
             fn: Function,
             delay?: number,
@@ -1516,6 +1527,18 @@ function splat(obj: any): Array<any> {
     return isArray(obj) ? obj : [obj];
 }
 
+function syncTimeout(fn: Function): undefined;
+function syncTimeout(
+    fn: Function,
+    delay: undefined|0,
+    context?: unknown
+): undefined;
+function syncTimeout(fn: Function, delay: number, context?: unknown): number;
+function syncTimeout(
+    fn: Function,
+    delay?: number,
+    context?: unknown
+): (number|undefined);
 /**
  * Set a timeout if the delay is given, otherwise perform the function
  * synchronously.
@@ -1535,16 +1558,16 @@ function splat(obj: any): Array<any> {
  *         An identifier for the timeout that can later be cleared with
  *         Highcharts.clearTimeout.
  */
-H.syncTimeout = function (
+function syncTimeout(
     fn: Function,
     delay?: number,
-    context?: any
+    context?: unknown
 ): (number|undefined) {
     if (delay) {
         return setTimeout(fn, delay, context);
     }
     fn.call(0, context);
-};
+}
 
 /**
  * Internal clear timeout. The function checks that the `id` was not removed
@@ -3336,7 +3359,8 @@ const utils = {
     isString,
     objectEach,
     pInt,
-    splat
+    splat,
+    syncTimeout
 };
 
 export default utils;

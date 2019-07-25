@@ -1019,12 +1019,12 @@ function splat(obj) {
  *         An identifier for the timeout that can later be cleared with
  *         Highcharts.clearTimeout.
  */
-H.syncTimeout = function (fn, delay, context) {
+function syncTimeout(fn, delay, context) {
     if (delay) {
         return setTimeout(fn, delay, context);
     }
     fn.call(0, context);
-};
+}
 /**
  * Internal clear timeout. The function checks that the `id` was not removed
  * (e.g. by `chart.destroy()`). For the details see
@@ -2493,6 +2493,7 @@ var utils = {
     isString: isString,
     objectEach: objectEach,
     pInt: pInt,
-    splat: splat
+    splat: splat,
+    syncTimeout: syncTimeout
 };
 export default utils;
