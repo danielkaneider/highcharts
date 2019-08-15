@@ -35,28 +35,6 @@ declare global {
         interface ChartOptions {
             zoomKey?: string;
         }
-        interface ColumnSeries {
-            /** @requires modules/draggable-points */
-            dragDropProps?: ColumnSeriesDragDropPropsObject;
-        }
-        interface ColumnSeriesDragDropPropsXAxisObject {
-            axis: string;
-            move: boolean;
-        }
-        interface ColumnSeriesDragDropPropsYAxisObject
-            extends ColumnSeriesDragDropPropsXAxisObject {
-            resize: boolean;
-            beforeResize(
-                guideBox: SVGElement,
-                pointVals: Array<number>,
-                point: ColumnPoint
-            ): void;
-            resizeSide(pointVals: Array<number>, point: ColumnPoint): string;
-        }
-        interface ColumnSeriesDragDropPropsObject {
-            x: ColumnSeriesDragDropPropsXAxisObject;
-            y: ColumnSeriesDragDropPropsYAxisObject;
-        }
         interface DragDropGuideBoxOptionsObject {
             className?: string;
             color?: ColorType;
@@ -92,22 +70,6 @@ declare global {
         interface DragHandlesObject {
             group: SVGElement;
             point: string;
-        }
-        interface FlagsSeries {
-            /** @requires modules/draggable-points */
-            dragDropProps?: LineSeriesDragDropPropsObject;
-        }
-        interface LineSeries {
-            /** @requires modules/draggable-points */
-            dragDropProps?: LineSeriesDragDropPropsObject;
-        }
-        interface LineSeriesDragDropPropsAxisObject {
-            axis: string;
-            move: boolean;
-        }
-        interface LineSeriesDragDropPropsObject {
-            x: LineSeriesDragDropPropsAxisObject;
-            y: LineSeriesDragDropPropsAxisObject;
         }
         interface PointDragCallbackFunction {
             (this: Point, event: PointDragEventObject): void;
@@ -151,6 +113,27 @@ declare global {
             dragDrop?: DragDropOptionsObject;
             dragStart?: PointDragStartCallbackFunction;
             drop?: PointDropCallbackFunction;
+        }
+        interface Series {
+            /** @requires modules/draggable-points */
+            dragDropProps?: SeriesDragDropPropsDictionary;
+        }
+        interface SeriesDragDropPropsDictionary {
+            [key: string]: Partial<SeriesDragDropPropsObject>;
+        }
+        interface SeriesDragDropPropsObject {
+            axis: string;
+            beforeResize?: Function;
+            move: boolean;
+            optionName: string;
+            resize: boolean;
+            resizeSide: (string|SeriesDragDropPropsResizeSideFunction);
+            handleFormatter(point: Point): (SVGPathArray|null);
+            handlePositioner(point: Point): PositionObject;
+            propValidate(val: number, point: Point): boolean;
+        }
+        interface SeriesDragDropPropsResizeSideFunction {
+            (...args: Array<any>): string;
         }
     }
 }
@@ -428,7 +411,7 @@ var columnDragDropProps = seriesTypes.column.prototype.dragDropProps = {
         // Force guideBox start coordinates
         beforeResize: function (
             guideBox: Highcharts.SVGElement,
-            pointVals: Array<number>,
+            pointVals: Highcharts.Dictionary<number>,
             point: Highcharts.ColumnPoint
         ): void {
             // We need to ensure that guideBox always starts at threshold.
@@ -440,24 +423,28 @@ var columnDragDropProps = seriesTypes.column.prototype.dragDropProps = {
                 height,
                 diff;
 
-            if (pointVals.y >= point.series.options.threshold || 0) {
+            if (pointVals.y >= (point.series.options.threshold as any) || 0) {
                 // Above threshold - always set height to hit the threshold
                 height = guideBox.attr('height');
-                diff = threshold ? threshold - (y + height) : 0;
+                diff = threshold ?
+                    threshold - ((y as any) + (height as any)) :
+                    0;
                 guideBox.attr({
-                    height: Math.max(0, Math.round(height + diff))
+                    height: Math.max(0, Math.round((height as any) + diff))
                 });
             } else {
                 // Below - always set y to start at threshold
                 guideBox.attr({
-                    y: Math.round(y + (threshold ? threshold - y : 0))
+                    y: Math.round((y as any) + (
+                        threshold ? threshold - (y as any) : 0
+                    ))
                 });
             }
         },
         // Flip the side of the resize handle if column is below threshold.
         // Make sure we remove the handle on the other side.
         resizeSide: function (
-            pointVals: Array<number>,
+            pointVals: Highcharts.Dictionary<number>,
             point: Highcharts.ColumnPoint
         ): string {
             var chart = point.series.chart,
@@ -467,27 +454,32 @@ var columnDragDropProps = seriesTypes.column.prototype.dragDropProps = {
                 flipSide = flipResizeSide(side);
 
             // Force remove handle on other side
-            if (dragHandles[flipSide]) {
-                dragHandles[flipSide].destroy();
-                delete dragHandles[flipSide];
+            if ((dragHandles as any)[flipSide]) {
+                (dragHandles as any)[flipSide].destroy();
+                delete (dragHandles as any)[flipSide];
             }
             return side;
         },
         // Position handle at bottom if column is below threshold
-        handlePositioner: function (point) {
-            var bBox = point.shapeArgs || point.graphic.getBBox();
+        handlePositioner: function (
+            point: Highcharts.ColumnPoint
+        ): Highcharts.PositionObject {
+            var bBox: Highcharts.BBoxObject =
+                (point.shapeArgs as any) || (point.graphic as any).getBBox();
 
             return {
                 x: bBox.x,
-                y: point.y >= (point.series.options.threshold || 0) ?
+                y: (point.y as any) >= (point.series.options.threshold || 0) ?
                     bBox.y : bBox.y + bBox.height
             };
         },
         // Horizontal handle
-        handleFormatter: function (point) {
+        handleFormatter: function (
+            point: Highcharts.ColumnPoint
+        ): Highcharts.SVGPathArray {
             var shapeArgs = point.shapeArgs,
-                radius = shapeArgs.r || 0, // Rounding of bar corners
-                centerX = shapeArgs.width / 2;
+                radius = (shapeArgs as any).r || 0, // Rounding of bar corners
+                centerX = (shapeArgs as any).width / 2;
 
             return [
                 // Left wick
@@ -498,7 +490,7 @@ var columnDragDropProps = seriesTypes.column.prototype.dragDropProps = {
                 'A', 1, 1, 0, 0, 0, centerX - 5, 0,
                 // Right wick
                 'M', centerX + 5, 0,
-                'L', shapeArgs.width - radius, 0
+                'L', (shapeArgs as any).width - radius, 0
             ];
         }
     }
@@ -523,8 +515,11 @@ if (seriesTypes.bullet) {
             move: true,
             resize: true,
             resizeSide: 'top',
-            handlePositioner: function (point) {
-                var bBox = point.targetGraphic.getBBox();
+            handlePositioner: function (
+                point: Highcharts.BulletPoint
+            ): Highcharts.PositionObject {
+                var bBox: Highcharts.BBoxObject =
+                    (point.targetGraphic as any).getBBox();
 
                 return {
                     x: point.barX,
@@ -557,8 +552,10 @@ if (seriesTypes.columnrange) {
             move: true,
             resize: true,
             resizeSide: 'bottom',
-            handlePositioner: function (point) {
-                var bBox = point.shapeArgs || point.graphic.getBBox();
+            handlePositioner: function (
+                point: Highcharts.ColumnRangePoint
+            ): Highcharts.PositionObject {
+                var bBox = point.shapeArgs || (point.graphic as any).getBBox();
 
                 return {
                     x: bBox.x,
@@ -566,7 +563,10 @@ if (seriesTypes.columnrange) {
                 };
             },
             handleFormatter: columnDragDropProps.y.handleFormatter,
-            propValidate: function (val, point) {
+            propValidate: function (
+                val: number,
+                point: Highcharts.ColumnRangePoint
+            ): boolean {
                 return val <= point.high;
             }
         },
@@ -584,8 +584,10 @@ if (seriesTypes.columnrange) {
             move: true,
             resize: true,
             resizeSide: 'top',
-            handlePositioner: function (point) {
-                var bBox = point.shapeArgs || point.graphic.getBBox();
+            handlePositioner: function (
+                point: Highcharts.ColumnRangePoint
+            ): Highcharts.PositionObject {
+                var bBox = point.shapeArgs || (point.graphic as any).getBBox();
 
                 return {
                     x: bBox.x,
@@ -593,7 +595,10 @@ if (seriesTypes.columnrange) {
                 };
             },
             handleFormatter: columnDragDropProps.y.handleFormatter,
-            propValidate: function (val, point) {
+            propValidate: function (
+                val: number,
+                point: Highcharts.ColumnRangePoint
+            ): boolean {
                 return val >= point.low;
             }
         }
@@ -618,14 +623,19 @@ if (seriesTypes.boxplot) {
             move: true,
             resize: true,
             resizeSide: 'bottom',
-            handlePositioner: function (point) {
+            handlePositioner: function (
+                point: Highcharts.BoxPlotPoint
+            ): Highcharts.PositionObject {
                 return {
                     x: point.shapeArgs.x,
                     y: point.lowPlot
                 };
             },
             handleFormatter: columnDragDropProps.y.handleFormatter,
-            propValidate: function (val, point) {
+            propValidate: function (
+                val: number,
+                point: Highcharts.BoxPlotPoint
+            ): boolean {
                 return val <= point.q1;
             }
         },
@@ -643,14 +653,19 @@ if (seriesTypes.boxplot) {
             move: true,
             resize: true,
             resizeSide: 'bottom',
-            handlePositioner: function (point) {
+            handlePositioner: function (
+                point: Highcharts.BoxPlotPoint
+            ): Highcharts.PositionObject {
                 return {
                     x: point.shapeArgs.x,
                     y: point.q1Plot
                 };
             },
             handleFormatter: columnDragDropProps.y.handleFormatter,
-            propValidate: function (val, point) {
+            propValidate: function (
+                val: number,
+                point: Highcharts.BoxPlotPoint
+            ): boolean {
                 return val <= point.median && val >= point.low;
             }
         },
@@ -674,14 +689,17 @@ if (seriesTypes.boxplot) {
             move: true,
             resize: true,
             resizeSide: 'top',
-            handlePositioner: function (point) {
+            handlePositioner: function (point: Highcharts.BoxPlotPoint) {
                 return {
                     x: point.shapeArgs.x,
                     y: point.q3Plot
                 };
             },
             handleFormatter: columnDragDropProps.y.handleFormatter,
-            propValidate: function (val, point) {
+            propValidate: function (
+                val: number,
+                point: Highcharts.BoxPlotPoint
+            ): boolean {
                 return val <= point.high && val >= point.median;
             }
         },
@@ -699,14 +717,19 @@ if (seriesTypes.boxplot) {
             move: true,
             resize: true,
             resizeSide: 'top',
-            handlePositioner: function (point) {
+            handlePositioner: function (
+                point: Highcharts.BoxPlotPoint
+            ): Highcharts.PositionObject {
                 return {
                     x: point.shapeArgs.x,
                     y: point.highPlot
                 };
             },
             handleFormatter: columnDragDropProps.y.handleFormatter,
-            propValidate: function (val, point) {
+            propValidate: function (
+                val: number,
+                point: Highcharts.BoxPlotPoint
+            ): boolean {
                 return val >= point.q3;
             }
         }
@@ -732,14 +755,19 @@ if (seriesTypes.ohlc) {
             move: true,
             resize: true,
             resizeSide: 'bottom',
-            handlePositioner: function (point) {
+            handlePositioner: function (
+                point: Highcharts.OHLCPoint
+            ): Highcharts.PositionObject {
                 return {
-                    x: point.shapeArgs.x,
-                    y: point.plotLow
+                    x: (point.shapeArgs as any).x,
+                    y: point.plotLow as any
                 };
             },
             handleFormatter: columnDragDropProps.y.handleFormatter,
-            propValidate: function (val, point) {
+            propValidate: function (
+                val: number,
+                point: Highcharts.OHLCPoint
+            ): boolean {
                 return val <= point.open && val <= point.close;
             }
         },
@@ -757,14 +785,19 @@ if (seriesTypes.ohlc) {
             move: true,
             resize: true,
             resizeSide: 'top',
-            handlePositioner: function (point) {
+            handlePositioner: function (
+                point: Highcharts.OHLCPoint
+            ): Highcharts.PositionObject {
                 return {
-                    x: point.shapeArgs.x,
-                    y: point.plotHigh
+                    x: (point.shapeArgs as any).x,
+                    y: point.plotHigh as any
                 };
             },
             handleFormatter: columnDragDropProps.y.handleFormatter,
-            propValidate: function (val, point) {
+            propValidate: function (
+                val: number,
+                point: Highcharts.OHLCPoint
+            ): boolean {
                 return val >= point.open && val >= point.close;
             }
         },
@@ -781,17 +814,22 @@ if (seriesTypes.ohlc) {
             axis: 'y',
             move: true,
             resize: true,
-            resizeSide: function (point) {
+            resizeSide: function (point: Highcharts.OHLCPoint): string {
                 return point.open >= point.close ? 'top' : 'bottom';
             },
-            handlePositioner: function (point) {
+            handlePositioner: function (
+                point: Highcharts.OHLCPoint
+            ): Highcharts.PositionObject {
                 return {
-                    x: point.shapeArgs.x,
+                    x: (point.shapeArgs as any).x,
                     y: point.plotOpen
                 };
             },
             handleFormatter: columnDragDropProps.y.handleFormatter,
-            propValidate: function (val, point) {
+            propValidate: function (
+                val: number,
+                point: Highcharts.OHLCPoint
+            ): boolean {
                 return val <= point.high && val >= point.low;
             }
         },
@@ -808,17 +846,22 @@ if (seriesTypes.ohlc) {
             axis: 'y',
             move: true,
             resize: true,
-            resizeSide: function (point) {
+            resizeSide: function (point: Highcharts.OHLCPoint): string {
                 return point.open >= point.close ? 'bottom' : 'top';
             },
-            handlePositioner: function (point) {
+            handlePositioner: function (
+                point: Highcharts.OHLCPoint
+            ): Highcharts.PositionObject {
                 return {
-                    x: point.shapeArgs.x,
+                    x: (point.shapeArgs as any).x,
                     y: point.plotClose
                 };
             },
             handleFormatter: columnDragDropProps.y.handleFormatter,
-            propValidate: function (val, point) {
+            propValidate: function (
+                val: number,
+                point: Highcharts.OHLCPoint
+            ): boolean {
                 return val <= point.high && val >= point.low;
             }
         }
@@ -827,10 +870,12 @@ if (seriesTypes.ohlc) {
 
 // Arearange series - move x, resize or move low/high
 if (seriesTypes.arearange) {
-    var columnrangeDragDropProps = seriesTypes.columnrange
-            .prototype.dragDropProps,
+    var columnrangeDragDropProps: Highcharts.SeriesDragDropPropsDictionary =
+            seriesTypes.columnrange.prototype.dragDropProps as any,
         // Use a circle covering the marker as drag handle
-        arearangeHandleFormatter = function (point) {
+        arearangeHandleFormatter = function (
+            point: Highcharts.AreaRangePoint
+        ): Highcharts.SVGPathArray {
             var radius = point.graphic ?
                 point.graphic.getBBox().width / 2 + 1 :
                 4;
@@ -858,7 +903,9 @@ if (seriesTypes.arearange) {
             move: true,
             resize: true,
             resizeSide: 'bottom',
-            handlePositioner: function (point) {
+            handlePositioner: function (
+                point: Highcharts.AreaRangePoint
+            ): Highcharts.PositionObject {
                 var bBox = point.lowerGraphic && point.lowerGraphic.getBBox();
 
                 return bBox ? {
@@ -867,7 +914,7 @@ if (seriesTypes.arearange) {
                 } : { x: -999, y: -999 };
             },
             handleFormatter: arearangeHandleFormatter,
-            propValidate: columnrangeDragDropProps.low.propValidate
+            propValidate: (columnrangeDragDropProps.low as any).propValidate
         },
         /**
          * Allow high value to be dragged individually. Requires
@@ -883,7 +930,9 @@ if (seriesTypes.arearange) {
             move: true,
             resize: true,
             resizeSide: 'top',
-            handlePositioner: function (point) {
+            handlePositioner: function (
+                point: Highcharts.AreaRangePoint
+            ): Highcharts.PositionObject {
                 var bBox = point.upperGraphic && point.upperGraphic.getBBox();
 
                 return bBox ? {
@@ -892,7 +941,7 @@ if (seriesTypes.arearange) {
                 } : { x: -999, y: -999 };
             },
             handleFormatter: arearangeHandleFormatter,
-            propValidate: columnrangeDragDropProps.high.propValidate
+            propValidate: (columnrangeDragDropProps.high as any).propValidate
         }
     };
 }
@@ -902,7 +951,9 @@ if (seriesTypes.waterfall) {
     seriesTypes.waterfall.prototype.dragDropProps = {
         x: columnDragDropProps.x,
         y: merge(columnDragDropProps.y, {
-            handleFormatter: function (point) {
+            handleFormatter: function (
+                point: Highcharts.WaterfallPoint
+            ): (Highcharts.SVGPathArray|null) {
                 return point.isSum || point.isIntermediateSum ? null :
                     columnDragDropProps.y.handleFormatter(point);
             }
@@ -915,23 +966,25 @@ if (seriesTypes.xrange) {
     // Handle positioner logic is the same for x and x2 apart from the
     // x value. shapeArgs does not take yAxis reversed etc into account, so we
     // use axis.toPixels to handle positioning.
-    var xrangeHandlePositioner = function (point, xProp) {
+    var xrangeHandlePositioner = function (
+        point: Highcharts.XRangePoint,
+        xProp: string
+    ): Highcharts.PositionObject {
             var series = point.series,
                 xAxis = series.xAxis,
                 yAxis = series.yAxis,
                 inverted = series.chart.inverted,
                 // Using toPixels handles axis.reversed, but doesn't take
                 // chart.inverted into account.
-                newX = xAxis.toPixels(point[xProp], true),
-                newY = yAxis.toPixels(point.y, true);
+                newX = xAxis.toPixels((point as any)[xProp], true),
+                newY = yAxis.toPixels(point.y as any, true);
 
             // Handle chart inverted
             if (inverted) {
                 newX = xAxis.len - newX;
-                newY = yAxis.len - newY -
-                    point.shapeArgs.height / 2;
+                newY = yAxis.len - newY - (point.shapeArgs as any).height / 2;
             } else {
-                newY -= point.shapeArgs.height / 2;
+                newY -= (point.shapeArgs as any).height / 2;
             }
 
             return {
@@ -958,12 +1011,17 @@ if (seriesTypes.xrange) {
                 move: true,
                 resize: true,
                 resizeSide: 'left',
-                handlePositioner: function (point) {
+                handlePositioner: function (
+                    point: Highcharts.XRangePoint
+                ): Highcharts.PositionObject {
                     return xrangeHandlePositioner(point, 'x');
                 },
                 handleFormatter: horizHandleFormatter,
-                propValidate: function (val, point) {
-                    return val <= point.x2;
+                propValidate: function (
+                    val: number,
+                    point: Highcharts.XRangePoint
+                ): boolean {
+                    return val <= (point.x2 as any);
                 }
             },
             /**
@@ -980,12 +1038,17 @@ if (seriesTypes.xrange) {
                 move: true,
                 resize: true,
                 resizeSide: 'right',
-                handlePositioner: function (point) {
+                handlePositioner: function (
+                    point: Highcharts.XRangePoint
+                ): Highcharts.PositionObject {
                     return xrangeHandlePositioner(point, 'x2');
                 },
                 handleFormatter: horizHandleFormatter,
-                propValidate: function (val, point) {
-                    return val >= point.x;
+                propValidate: function (
+                    val: number,
+                    point: Highcharts.XRangePoint
+                ): boolean {
+                    return val >= (point.x as any);
                 }
             }
         };
