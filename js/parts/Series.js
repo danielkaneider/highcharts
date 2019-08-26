@@ -3726,6 +3726,9 @@ H.Series = H.seriesType('line', null
                 );
                 pointStack = stack[xValue];
                 stackValues = pointStack.points[stackIndicator.key];
+			}
+
+            if (isArray(stackValues)) {
                 yBottom = stackValues[0];
                 yValue = stackValues[1];
 
